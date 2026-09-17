@@ -1,0 +1,36 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar dependências
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install tidal-wave mutagen pyinstaller pywebview imageio-ffmpeg
+      - name: Preparar FFmpeg
+        shell: pwsh
+        run: python -c "import imageio_ffmpeg,shutil; shutil.copy2(imageio_ffmpeg.get_ffmpeg_exe(), 'ffmpeg.exe')"
+      - name: Gerar executável
+        shell: pwsh
+        run: pyinstaller --distpath dist --workpath build --noconfirm TidalDownloader.spec
+      - name: Empacotar artefato
+        shell: pwsh
+        run: Compress-Archive -Path dist/TidalDownloader -DestinationPath TidalDownloader-Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TidalDownloader-Windows
+          path: TidalDownloader-Windows.zip

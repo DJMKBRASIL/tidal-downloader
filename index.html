@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tidal Downloader</title>
+<style>
+  :root{
+    --bg:#0c0d10; --card:#15171c; --linha:#22252c; --texto:#e8eaed;
+    --fraco:#8b909a; --azul:#3b82f6; --verde:#22c55e; --amarelo:#f59e0b; --vermelho:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--texto);
+       font:15px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;
+       padding:28px 20px 60px}
+  .wrap{max-width:820px;margin:0 auto}
+  h1{font-size:20px;margin:0 0 20px;font-weight:600;letter-spacing:-.01em}
+  h1 span{color:var(--fraco);font-weight:400}
+  .card{background:var(--card);border:1px solid var(--linha);border-radius:12px;padding:18px;margin-bottom:16px}
+
+  /* faixa de status do token */
+  #token{display:flex;align-items:center;gap:12px;font-weight:500}
+  #token .bolinha{width:10px;height:10px;border-radius:50%;flex:0 0 auto}
+  #token.ok .bolinha{background:var(--verde)}
+  #token.acabando .bolinha{background:var(--amarelo)}
+  #token.vencido .bolinha{background:var(--vermelho)}
+  #token.vencido{color:#fecaca;background:rgba(239,68,68,.08);
+                 border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:14px 16px;
+                 font-size:16px;font-weight:600}
+  #token .dica{font-weight:400;color:var(--fraco);font-size:13px;margin-left:auto}
+
+  textarea{width:100%;min-height:92px;resize:vertical;background:#0f1114;color:var(--texto);
+           border:1px solid var(--linha);border-radius:9px;padding:12px 14px;
+           font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+  textarea:focus{outline:none;border-color:var(--azul)}
+  textarea::placeholder{color:#565b66}
+
+  .linha{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+  button{background:var(--azul);color:#fff;border:0;border-radius:8px;padding:10px 20px;
+         font-size:14px;font-weight:600;cursor:pointer}
+  button:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.fraco{background:transparent;color:var(--fraco);border:1px solid var(--linha);font-weight:500}
+
+  .destino{font-size:13px;color:var(--fraco);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .destino code{background:#0f1114;border:1px solid var(--linha);border-radius:6px;
+                padding:3px 8px;color:#c8ccd4;font-size:12px}
+  .destino .alerta{color:var(--amarelo)}
+  .destino a{color:var(--azul);cursor:pointer;text-decoration:none}
+
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{text-align:left;font-weight:500;color:var(--fraco);font-size:12px;
+     text-transform:uppercase;letter-spacing:.04em;padding:0 10px 10px;border-bottom:1px solid var(--linha)}
+  td{padding:11px 10px;border-bottom:1px solid var(--linha);vertical-align:middle}
+  tr:last-child td{border-bottom:0}
+  .faixa{font-weight:500}
+  .faixa small{display:block;color:var(--fraco);font-weight:400;font-size:12px;margin-top:1px}
+  .sit{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:600;white-space:nowrap}
+  .sit.pendente{background:#1e2530;color:#93a4bd}
+  .sit.baixando{background:rgba(59,130,246,.15);color:#7fb0ff}
+  .sit.concluido{background:rgba(34,197,94,.13);color:#5ee08a}
+  .sit.falhou{background:rgba(239,68,68,.13);color:#ff8f8f}
+  .sit.aguardando_token{background:rgba(245,158,11,.14);color:#ffc55c}
+  .detalhe{color:var(--fraco);font-size:12px}
+  .abrir-local{background:transparent;color:var(--azul);border:0;padding:0;
+               font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .abrir-local:hover{color:#7fb0ff;text-decoration:underline}
+  .vazio{color:var(--fraco);text-align:center;padding:26px 0;font-size:14px}
+  .aviso{margin-top:6px;font-size:13px;color:var(--amarelo)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Tidal Downloader <span>· FLAC lossless</span></h1>
+
+  <div class="card"><div id="token" class="ok">
+    <span class="bolinha"></span><span id="tokenMsg">carregando…</span>
+  </div></div>
+
+  <div class="card">
+    <textarea id="links" placeholder="Cole o link da faixa, álbum OU playlist (um por linha)&#10;https://tidal.com/browse/track/443018716&#10;https://tidal.com/album/547868147&#10;https://tidal.com/browse/playlist/79122ce5-4d07-4c59-a432-e654d7422e5a&#10;ou só o ID da faixa: 443018716"></textarea>
+    <div class="linha">
+      <button id="btn" onclick="baixar()">Baixar</button>
+      <button class="fraco" onclick="limpar()">Limpar concluídos</button>
+      <span id="aviso" class="aviso"></span>
+    </div>
+    <div class="linha destino">
+      <span>Salvando em</span><code id="destino">—</code>
+      <a onclick="trocarDestino()">trocar</a>
+      <span id="destinoAlerta" class="alerta"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead><tr><th style="width:48%">Faixa</th><th style="width:16%">Situação</th><th style="width:20%">Detalhe</th><th></th></tr></thead>
+      <tbody id="fila"><tr><td colspan="4" class="vazio">Nada na fila</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const rotulos = {pendente:'na fila', baixando:'baixando', concluido:'concluído',
+                 falhou:'falhou', aguardando_token:'aguardando token'};
+
+async function atualizar(){
+  let d;
+  try { d = await (await fetch('/api/estado')).json(); }
+  catch(e){ return; }
+
+  const box = document.getElementById('token');
+  box.className = d.token.situacao;
+  document.getElementById('tokenMsg').textContent = d.token.mensagem;
+
+  document.getElementById('destino').textContent = d.destino;
+  document.getElementById('destinoAlerta').textContent =
+    d.destino_ok ? '' : '⚠ pasta indisponível (SSD desconectado?)';
+
+  const tb = document.getElementById('fila');
+  if(!d.fila.length){
+    tb.innerHTML = '<tr><td colspan="4" class="vazio">Nada na fila</td></tr>';
+    return;
+  }
+  tb.innerHTML = d.fila.map(i => {
+    const nome = i.artista ? `${i.artista} — ${i.titulo}` : `faixa ${i.track_id}`;
+    const sub  = i.artista ? `ID ${i.track_id}` : '';
+    const acao = (i.situacao === 'concluido' && i.arquivo)
+      ? `<button class="abrir-local" data-arquivo="${escAttr(i.arquivo)}">Abrir local</button>` : '';
+    return `<tr>
+      <td class="faixa">${esc(nome)}${sub ? `<small>${esc(sub)}</small>` : ''}</td>
+      <td><span class="sit ${i.situacao}">${rotulos[i.situacao] || i.situacao}</span></td>
+      <td class="detalhe">${esc(i.detalhe || '')}</td>
+      <td>${acao}</td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function escAttr(s){ return esc(s).replace(/'/g, '&#39;'); }
+
+document.getElementById('fila').addEventListener('click', async e => {
+  const btn = e.target.closest('.abrir-local');
+  if(!btn) return;
+  await fetch('/api/revelar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({arquivo: btn.dataset.arquivo})
+  });
+});
+
+async function baixar(){
+  const ta = document.getElementById('links');
+  const links = ta.value.trim();
+  if(!links) return;
+  const btn = document.getElementById('btn');
+  btn.disabled = true;
+  const r = await (await fetch('/api/baixar', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({links})
+  })).json();
+  btn.disabled = false;
+  const aviso = document.getElementById('aviso');
+  if(r.erro){ aviso.textContent = r.erro; }
+  else {
+    ta.value = '';
+    const partes = [];
+    if(r.aceitos) partes.push(`${r.aceitos} faixa${r.aceitos === 1 ? '' : 's'} na fila`);
+    if(r.recusados && r.recusados.length) partes.push(`${r.recusados.length} recusado(s)`);
+    aviso.textContent = partes.join(' · ');
+  }
+  setTimeout(() => aviso.textContent = '', 6000);
+  atualizar();
+}
+
+async function limpar(){
+  await fetch('/api/limpar', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  atualizar();
+}
+
+async function trocarDestino(){
+  // tenta o dialogo NATIVO do Finder primeiro (so existe dentro do app,
+  // via pywebview); se a dashboard estiver aberta num navegador comum
+  // (modo dev sem pywebview), cai pro prompt de texto de sempre.
+  const r1 = await (await fetch('/api/escolher_pasta', {method:'POST'})).json();
+  if(r1.erro === 'sem_janela_nativa'){
+    const atual = document.getElementById('destino').textContent;
+    const novo = prompt('Pasta de destino:', atual);
+    if(!novo) return;
+    const r2 = await (await fetch('/api/destino', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({destino:novo})
+    })).json();
+    if(r2.erro) alert(r2.erro);
+  } else if(r1.erro){
+    alert(r1.erro);
+  }
+  // cancelado (r1.cancelado) nao precisa de feedback — usuario so desistiu
+  atualizar();
+}
+
+document.getElementById('links').addEventListener('keydown', e => {
+  if((e.metaKey || e.ctrlKey) && e.key === 'Enter') baixar();
+});
+
+atualizar();
+setInterval(atualizar, 3000);
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+logs/
+download/
+config.json
+build_mac/venv/
+build_mac/build/
+build_mac/dist/
+build_mac/dmg_staging/
+build_mac/TidalDownloader.dmg
+build_windows/venv/
+build_windows/build/
+build_windows/dist/
+build_windows/ffmpeg.exe
